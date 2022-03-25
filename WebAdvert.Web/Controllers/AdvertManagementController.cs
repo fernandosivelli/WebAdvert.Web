@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Amazon.Runtime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using WebAdvert.Api.Domain.Enums;
 using WebAdvert.Api.Domain.Models;
 using WebAdvert.Web.Models;
@@ -44,16 +45,18 @@ namespace WebAdvert.Web.Controllers
                 Price = model.Price
             };
 
-            var advertId = await _advertApiClient.CreateAsync(advertModel);
+            var createAdvertResponseJson = await _advertApiClient.CreateAsync(advertModel);
+
+            var createAdvertResponseModel = JsonConvert.DeserializeObject<CreateAdvertResponseModel>(createAdvertResponseJson);
 
             if (imageFile == null)
                 return View(model);
 
             var fileName = !string.IsNullOrEmpty(imageFile.FileName)
                 ? Path.GetFileName(imageFile.FileName)
-                : advertId;
+                : createAdvertResponseModel.Id;
 
-            var filePath = $"{advertId}/{fileName}";
+            var filePath = $"{createAdvertResponseModel.Id}/{fileName}";
 
             try
             {
@@ -65,20 +68,20 @@ namespace WebAdvert.Web.Controllers
 
                 var confirmAdvertModel = new ConfirmAdvertModel()
                 {
-                    Id = advertId,
+                    Id = createAdvertResponseModel.Id,
                     Status = AdvertStatusEnum.Active
                 };
 
                 var canConfirm = await _advertApiClient.ConfirmAsync(confirmAdvertModel);
                 if (!canConfirm)
-                    throw new Exception($"Cannot confirm advert of id = {advertId}");
+                    throw new Exception($"Cannot confirm advert of id = {createAdvertResponseModel.Id}");
 
             }
             catch (Exception ex)
             {
                 var confirmAdvertModel = new ConfirmAdvertModel()
                 {
-                    Id = advertId,
+                    Id = createAdvertResponseModel.Id,
                     Status = AdvertStatusEnum.Pending
                 };
                 await _advertApiClient.ConfirmAsync(confirmAdvertModel).ConfigureAwait(false);
